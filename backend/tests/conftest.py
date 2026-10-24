@@ -7,6 +7,7 @@ import pytest
 
 URL_TESTE = os.getenv("DATABASE_URL_TESTE", "postgresql://pulso:pulso@localhost:5432/pulso_teste")
 os.environ["DATABASE_URL"] = URL_TESTE  # antes de importar src.config
+os.environ["PULSO_EXPLICACOES"] = ""  # a carga dos testes nao importa db/explicacoes.jsonl
 
 from src import db  # noqa: E402
 from src.pipeline import carga, processamento  # noqa: E402

@@ -183,8 +183,9 @@ def dados(con: psycopg.Connection) -> dict:
     }
 
 
-def csv_fila(con: psycopg.Connection, modo: str = "recomendada") -> str:
-    """O entregavel: solicitacao_id, posicao, justificativa."""
+def csv_fila(con: psycopg.Connection, modo: str = "recomendada", com_explicacao: bool = False) -> str:
+    """O entregavel: solicitacao_id, posicao, justificativa. com_explicacao: usa o texto do LLM ja
+    gerado para os fatos de agora, onde houver (o resto fica com o template)."""
     if modo == "oficial":
         linhas = con.execute("""SELECT solicitacao_id, posicao_final AS posicao, justificativa
                                 FROM fila_priorizada ORDER BY posicao_final""").fetchall()
@@ -192,6 +193,10 @@ def csv_fila(con: psycopg.Connection, modo: str = "recomendada") -> str:
         linhas = con.execute("SELECT solicitacao_id, posicao, justificativa FROM fila_recomendada ORDER BY posicao").fetchall()
     else:
         raise ValueError("modo deve ser oficial ou recomendada")
+    if com_explicacao:
+        from .explicacao import em_cache
+        for x in linhas:
+            x["justificativa"] = em_cache(con, "solicitacao", x["solicitacao_id"]) or x["justificativa"]
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["solicitacao_id", "posicao", "justificativa"])
@@ -199,8 +204,8 @@ def csv_fila(con: psycopg.Connection, modo: str = "recomendada") -> str:
     return buf.getvalue()
 
 
-def exportar(con: psycopg.Connection, caminho, modo: str = "recomendada") -> Path:
+def exportar(con: psycopg.Connection, caminho, modo: str = "recomendada", com_explicacao: bool = False) -> Path:
     caminho = Path(caminho)
     caminho.parent.mkdir(parents=True, exist_ok=True)
-    caminho.write_text(csv_fila(con, modo), encoding="utf-8")
+    caminho.write_text(csv_fila(con, modo, com_explicacao), encoding="utf-8")
     return caminho

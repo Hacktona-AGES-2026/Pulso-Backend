@@ -7,7 +7,9 @@
   python -m src.pipeline decidir ID aprovar|rejeitar --medico 1 [--motivo "..."]
   python -m src.pipeline aprovar-todas --medico 1 (demo/teste: fila oficial = recomendada)
   python -m src.pipeline varrer [--data AAAA-MM-DD]
-  python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv]
+  python -m src.pipeline explicar mudancas|fila [--limite N|0=todos] [--paralelo 4]   texto claro pelo LLM
+  python -m src.pipeline salvar-explicacoes     grava os textos do LLM em db/explicacoes.jsonl (a carga importa)
+  python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv] [--explicacao]
   python -m src.pipeline resumo
 """
 from __future__ import annotations
@@ -18,7 +20,7 @@ import sys
 import time
 
 from .. import db
-from . import carga, consultas, fila, processamento
+from . import carga, consultas, explicacao, fila, processamento
 
 
 def main(argv=None) -> int:
@@ -43,9 +45,15 @@ def main(argv=None) -> int:
     p.add_argument("--medico", type=int, required=True)
     p = sub.add_parser("varrer")
     p.add_argument("--data")
+    p = sub.add_parser("explicar", help="gera o texto claro dos pedidos pendentes ou do topo da fila")
+    p.add_argument("alvo", choices=["mudancas", "fila"])
+    p.add_argument("--limite", type=int, default=10, help="0 = todos")
+    p.add_argument("--paralelo", type=int, default=4, help="chamadas ao LLM ao mesmo tempo")
+    sub.add_parser("salvar-explicacoes", help="grava os textos aceitos em db/explicacoes.jsonl")
     p = sub.add_parser("exportar")
     p.add_argument("--modo", default="recomendada", choices=["recomendada", "oficial"])
     p.add_argument("--saida", default="saida/fila_priorizada.csv")
+    p.add_argument("--explicacao", action="store_true", help="justificativa = texto do LLM ja gerado, onde houver")
     sub.add_parser("resumo")
     a = ap.parse_args(argv)
 
@@ -75,12 +83,57 @@ def main(argv=None) -> int:
             print(f"{n} pedidos aprovados")
         elif a.cmd == "varrer":
             _imprimir("varredura", processamento.varrer(con, a.data))
+        elif a.cmd == "explicar":
+            _explicar(con, a.alvo, a.limite, a.paralelo)
+        elif a.cmd == "salvar-explicacoes":
+            _salvar_explicacoes(con)
         elif a.cmd == "exportar":
-            print(consultas.exportar(con, a.saida, a.modo))
+            print(consultas.exportar(con, a.saida, a.modo, a.explicacao))
         elif a.cmd == "resumo":
             _imprimir_resumo(consultas.resumo(con))
         print(f"({time.time() - t0:.1f} s)", file=sys.stderr)
     return 0
+
+
+def _explicar(con, alvo: str, limite: int, paralelo: int) -> None:
+    """Gera em paralelo (uma conexao por chamada); com Ollama, rode com OLLAMA_NUM_PARALLEL >= paralelo."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from ..llm import LLM, LLMIndisponivel
+    try:
+        llm = LLM()
+    except LLMIndisponivel as exc:
+        print(f"LLM indisponivel: {exc}", file=sys.stderr)
+        return
+    n = limite or 100_000
+    if alvo == "mudancas":
+        ids = [("mudanca", m["id"]) for m in consultas.mudancas(con, "pendente", n)]
+    else:
+        ids = [("solicitacao", r["solicitacao_id"]) for r in consultas.fila(con, "recomendada", limite=n)]
+    print(f"{llm.provedor}/{llm.modelo}: {len(ids)} textos, {paralelo} por vez")
+    detalhar = len(ids) <= 20
+
+    def um(item):
+        with db.conectar() as c:
+            return item, explicacao.explicar(c, item[0], item[1], LLM(llm.provedor, llm.modelo))
+
+    contagem, t0 = {}, time.time()
+    with ThreadPoolExecutor(max(1, paralelo)) as pool:
+        for k, ((tipo, i), r) in enumerate(pool.map(um, ids), 1):
+            chave = "cache" if r.get("em_cache") else r["fonte"]
+            contagem[chave] = contagem.get(chave, 0) + 1
+            if detalhar:
+                print(f"\n[{chave}] {tipo} {i}" + (f"  ({r['motivo']})" if r.get("motivo") else ""))
+                print(f"  {r['texto']}")
+            elif k % 25 == 0 or k == len(ids):
+                print(f"{k}/{len(ids)}  {time.time() - t0:.0f} s  {contagem}", flush=True)
+    print(f"\n{contagem}  ({(time.time() - t0) / max(1, len(ids)):.1f} s por texto)")
+    _salvar_explicacoes(con)
+
+
+def _salvar_explicacoes(con) -> None:
+    r = explicacao.salvar_cache(con)
+    print(f"{r[1]} textos em {r[0]}" if r else "PULSO_EXPLICACOES vazio: nada gravado")
 
 
 def _imprimir(titulo, d) -> None:
