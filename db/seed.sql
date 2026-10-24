@@ -1,4 +1,4 @@
--- Gerado por backend/db/gerar_seed.py a partir de ideas/data/dataset/. Não editar à mão.
+-- Gerado por db/gerar_seed.py a partir de ideas/data/dataset/. Não editar à mão.
 -- Solicitações: 941 ({'ativa': 897, 'duplicata': 22, 'saiu': 22})
 -- Eventos carregados: 1490 de 1505
 -- Eventos órfãos descartados (9): EVT-000262, EVT-000267, EVT-000287, EVT-000345, EVT-000491, EVT-000562, EVT-000623, EVT-000768, EVT-001020

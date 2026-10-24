@@ -6,7 +6,7 @@ Schema essencial para o Desafio 1: a fila cirúrgica e os eventos do dataset com
 
 ```bash
 createdb pulso
-psql -d pulso -f backend/db/schema.sql -f backend/db/seed.sql
+psql -d pulso -f db/schema.sql -f db/seed.sql
 ```
 
 O `schema.sql` apaga e recria as tabelas, então dá para rodar de novo quando quiser.
@@ -14,7 +14,7 @@ O `schema.sql` apaga e recria as tabelas, então dá para rodar de novo quando q
 Para regerar o `seed.sql` depois de mudar os CSVs ou as regras de limpeza (só usa a biblioteca padrão do Python):
 
 ```bash
-python backend/db/gerar_seed.py
+python db/gerar_seed.py
 ```
 
 ## Tabelas

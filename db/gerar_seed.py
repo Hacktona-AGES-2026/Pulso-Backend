@@ -1,10 +1,10 @@
-"""Gera backend/db/seed.sql a partir dos CSVs de ideas/data/dataset/.
+"""Gera db/seed.sql a partir dos CSVs de ideas/data/dataset/.
 
-Uso: python backend/db/gerar_seed.py [--dataset ideas/data/dataset] [--saida backend/db/seed.sql]
+Uso: python db/gerar_seed.py [--dataset ideas/data/dataset] [--saida db/seed.sql]
 
 Só usa a biblioteca padrão. O resultado é determinístico (semente fixa), então o
 seed.sql pode ser versionado e recarregado em qualquer máquina com:
-    psql -d pulso -f backend/db/schema.sql -f backend/db/seed.sql
+    psql -d pulso -f db/schema.sql -f db/seed.sql
 
 O que o script faz além de copiar os CSVs:
   - normaliza CID (maiúsculas, sem ponto), prioridade (minúsculas, sem acento)
@@ -96,9 +96,9 @@ def insert(tabela, colunas, linhas):
 
 def main():
     ap = argparse.ArgumentParser()
-    raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument('--dataset', default=os.path.join(raiz, 'ideas', 'data', 'dataset'))
-    ap.add_argument('--saida', default=os.path.join(raiz, 'backend', 'db', 'seed.sql'))
+    ap.add_argument('--saida', default=os.path.join(raiz, 'db', 'seed.sql'))
     args = ap.parse_args()
 
     rng = random.Random(SEMENTE)
@@ -219,7 +219,7 @@ def main():
     # Escrita -------------------------------------------------------------------
     contagem = Counter(s[20] for s in solicitacoes)
     with open(args.saida, 'w', encoding='utf-8') as out:
-        out.write('-- Gerado por backend/db/gerar_seed.py a partir de ideas/data/dataset/. Não editar à mão.\n')
+        out.write('-- Gerado por db/gerar_seed.py a partir de ideas/data/dataset/. Não editar à mão.\n')
         out.write(f'-- Solicitações: {len(solicitacoes)} ({dict(sorted(contagem.items()))})\n')
         out.write(f'-- Eventos carregados: {len(eventos_ok)} de {len(eventos)}\n')
         out.write(f'-- Eventos órfãos descartados ({len(orfaos)}): {", ".join(orfaos)}\n')

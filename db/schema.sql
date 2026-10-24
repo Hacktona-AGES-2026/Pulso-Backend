@@ -4,7 +4,7 @@
 -- Saída:   a fila priorizada (posição + justificativa), que é o entregável do case.
 -- Hospital e médico não existem no dataset: são gerados de forma sintética pelo seed.
 --
--- Uso: psql -d pulso -f backend/db/schema.sql -f backend/db/seed.sql
+-- Uso: psql -d pulso -f db/schema.sql -f db/seed.sql
 
 BEGIN;
 
