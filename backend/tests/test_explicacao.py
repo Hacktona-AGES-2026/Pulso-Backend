@@ -32,11 +32,13 @@ def _pedido(con):
 # ---------------------------------------------------------------------------- conferencia (sem banco)
 FATOS = ("Fila indicada pelo sistema: Eletivo estavel (G7), prazo de 360 dias.\n"
          "Entrada na fila: 15/09/2023. Espera ate 23/10/2026: 1134 dias.\n"
-         "Diagnostico: CID K40.9, Hernia inguinal.")
+         "Diagnostico: CID K40.9, Hernia inguinal.\n"
+         "Pendencias: faltou duas ou mais vezes.")
 
 
 def test_conferir_aceita_o_que_esta_nos_fatos():
-    assert ex.conferir("Esta em Eletivo estavel desde 15/09/2023, ha 1134 dias; o prazo e de 360 dias.", FATOS) == []
+    assert ex.conferir("Esta em Eletivo estavel desde 15/09/2023, ha 1134 dias; o prazo e de 360 dias. "
+                       "Sem alertas; o paciente faltou duas ou mais vezes.", FATOS) == []
 
 
 @pytest.mark.parametrize("texto, problema", [
@@ -44,6 +46,8 @@ def test_conferir_aceita_o_que_esta_nos_fatos():
     ("Esta na fila G1a.", "fila que nao esta nos fatos"),
     ("Paciente com cancer de colon.", "termo oncologico"),
     ("", "texto vazio"),
+    ("Esta em Deterioracao recente.", "fila que nao esta nos fatos"),
+    ("Nao ha pendencias para o medico.", "nao ha pendencias"),
 ])
 def test_conferir_recusa_o_que_nao_esta_nos_fatos(texto, problema):
     assert any(problema in p for p in ex.conferir(texto, FATOS))

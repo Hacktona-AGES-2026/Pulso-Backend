@@ -19,8 +19,9 @@ from datetime import date
 import psycopg
 
 from ..llm import LLM, LLMIndisponivel
+from priorizacao import config as regras
 
-VERSAO = "1"  # subir quando mudar o prompt ou os fatos: invalida o cache
+VERSAO = "2"  # subir quando mudar o prompt ou os fatos: invalida o cache
 LIMITE = 400  # caracteres
 
 SISTEMA = """Voce explica a fila de cirurgias eletivas do SUS para o medico regulador, em portugues claro.
@@ -70,6 +71,8 @@ N_EVENTOS = 6
 _NUM = re.compile(r"\d+")
 _CODIGO = re.compile(r"\bG[1-7][ab]?\b")
 _TERMOS_ONCO = ("cancer", "malign", "tumor", "neoplasi", "carcinom", "metasta")
+# "nao ha pendencias", "sem alertas"... quando os fatos tem pendencias/alertas
+_NEGA = re.compile(r"\b(?:nao ha|nao existem?|sem|nenhuma?)\s+(?:\w+\s+){0,2}?(pendencia|alerta)")
 
 
 def _norm(s: str) -> str:
@@ -94,6 +97,12 @@ def conferir(texto: str, fatos: str) -> list[str]:
     termos = [x for x in _TERMOS_ONCO if x in t and x not in f]
     if termos:
         problemas.append("termo oncologico que nao esta nos fatos: " + ", ".join(termos))
+    filas = [n for _, n, _ in regras.GRUPOS if _norm(n) in t and _norm(n) not in f]
+    if filas:
+        problemas.append("fila que nao esta nos fatos: " + ", ".join(filas))
+    negados = sorted({m for m in _NEGA.findall(t) if f"{m}s:" in f or f"{m}s para o medico:" in f})
+    if negados:
+        problemas.append("diz que nao ha " + ", ".join(f"{m}s" for m in negados) + ", mas os fatos tem")
     return problemas
 
 

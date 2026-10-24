@@ -4,7 +4,8 @@
   PULSO_LLM_MODEL     modelo do provedor (padrao na tabela abaixo)
   GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY para os hospedados (backend/.env ou .env da raiz)
 
-Ollama local: `ollama serve` e `ollama pull gemma4:12b`.
+Ollama local: `OLLAMA_NUM_PARALLEL=4 ollama serve` e `ollama pull gemma4:e4b` (4B efetivos, ~5 s por texto;
+gemma4:e2b e o mais rapido, ~3 s, e erra mais: a conferencia recusa e ele tenta de novo).
 """
 from __future__ import annotations
 
@@ -18,12 +19,12 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 from . import config  # noqa: F401  (carrega os .env)
 
 PROVEDORES = {
-    "ollama": ("http://localhost:11434/v1", None, "gemma4:12b"),
+    "ollama": ("http://localhost:11434/v1", None, "gemma4:e4b"),
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "openai/gpt-oss-20b"),
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "gemini-2.5-flash"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "qwen/qwen3-14b:free"),
 }
-# Raciocinio desligado ou curto: o texto e curto e o gemma4 local pensa ~10x mais sem ganho
+# Raciocinio desligado ou curto: o texto e curto e pensar so deixa mais lento
 RACIOCINIO = {"ollama": "none", "groq": "low"}
 
 

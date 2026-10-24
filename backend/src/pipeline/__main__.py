@@ -7,7 +7,7 @@
   python -m src.pipeline decidir ID aprovar|rejeitar --medico 1 [--motivo "..."]
   python -m src.pipeline aprovar-todas --medico 1 (demo/teste: fila oficial = recomendada)
   python -m src.pipeline varrer [--data AAAA-MM-DD]
-  python -m src.pipeline explicar mudancas|fila [--limite N]   texto claro pelo LLM (cache no banco)
+  python -m src.pipeline explicar mudancas|fila [--limite N|0=todos] [--paralelo 4]   texto claro pelo LLM
   python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv] [--explicacao]
   python -m src.pipeline resumo
 """
@@ -46,7 +46,8 @@ def main(argv=None) -> int:
     p.add_argument("--data")
     p = sub.add_parser("explicar", help="gera o texto claro dos pedidos pendentes ou do topo da fila")
     p.add_argument("alvo", choices=["mudancas", "fila"])
-    p.add_argument("--limite", type=int, default=10)
+    p.add_argument("--limite", type=int, default=10, help="0 = todos")
+    p.add_argument("--paralelo", type=int, default=4, help="chamadas ao LLM ao mesmo tempo")
     p = sub.add_parser("exportar")
     p.add_argument("--modo", default="recomendada", choices=["recomendada", "oficial"])
     p.add_argument("--saida", default="saida/fila_priorizada.csv")
@@ -81,7 +82,7 @@ def main(argv=None) -> int:
         elif a.cmd == "varrer":
             _imprimir("varredura", processamento.varrer(con, a.data))
         elif a.cmd == "explicar":
-            _explicar(con, a.alvo, a.limite)
+            _explicar(con, a.alvo, a.limite, a.paralelo)
         elif a.cmd == "exportar":
             print(consultas.exportar(con, a.saida, a.modo, a.explicacao))
         elif a.cmd == "resumo":
@@ -90,26 +91,39 @@ def main(argv=None) -> int:
     return 0
 
 
-def _explicar(con, alvo: str, limite: int) -> None:
+def _explicar(con, alvo: str, limite: int, paralelo: int) -> None:
+    """Gera em paralelo (uma conexao por chamada); com Ollama, rode com OLLAMA_NUM_PARALLEL >= paralelo."""
+    from concurrent.futures import ThreadPoolExecutor
+
     from ..llm import LLM, LLMIndisponivel
     try:
         llm = LLM()
     except LLMIndisponivel as exc:
         print(f"LLM indisponivel: {exc}", file=sys.stderr)
         return
+    n = limite or 100_000
     if alvo == "mudancas":
-        ids = [("mudanca", m["id"]) for m in consultas.mudancas(con, "pendente", limite)]
+        ids = [("mudanca", m["id"]) for m in consultas.mudancas(con, "pendente", n)]
     else:
-        ids = [("solicitacao", r["solicitacao_id"]) for r in consultas.fila(con, "recomendada", limite=limite)]
-    print(f"{llm.provedor}/{llm.modelo}: {len(ids)} textos")
-    contagem = {}
-    for tipo, i in ids:
-        r = explicacao.explicar(con, tipo, i, llm)
-        chave = "cache" if r.get("em_cache") else r["fonte"]
-        contagem[chave] = contagem.get(chave, 0) + 1
-        print(f"\n[{chave}] {tipo} {i}" + (f"  ({r['motivo']})" if r.get("motivo") else ""))
-        print(f"  {r['texto']}")
-    print(f"\n{contagem}")
+        ids = [("solicitacao", r["solicitacao_id"]) for r in consultas.fila(con, "recomendada", limite=n)]
+    print(f"{llm.provedor}/{llm.modelo}: {len(ids)} textos, {paralelo} por vez")
+    detalhar = len(ids) <= 20
+
+    def um(item):
+        with db.conectar() as c:
+            return item, explicacao.explicar(c, item[0], item[1], LLM(llm.provedor, llm.modelo))
+
+    contagem, t0 = {}, time.time()
+    with ThreadPoolExecutor(max(1, paralelo)) as pool:
+        for k, ((tipo, i), r) in enumerate(pool.map(um, ids), 1):
+            chave = "cache" if r.get("em_cache") else r["fonte"]
+            contagem[chave] = contagem.get(chave, 0) + 1
+            if detalhar:
+                print(f"\n[{chave}] {tipo} {i}" + (f"  ({r['motivo']})" if r.get("motivo") else ""))
+                print(f"  {r['texto']}")
+            elif k % 25 == 0 or k == len(ids):
+                print(f"{k}/{len(ids)}  {time.time() - t0:.0f} s  {contagem}", flush=True)
+    print(f"\n{contagem}  ({(time.time() - t0) / max(1, len(ids)):.1f} s por texto)")
 
 
 def _imprimir(titulo, d) -> None:
