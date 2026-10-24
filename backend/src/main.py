@@ -10,6 +10,7 @@ from typing import Literal
 
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
@@ -18,6 +19,13 @@ from .llm import LLM
 from .pipeline import consultas, explicacao, fila as fila_oficial, processamento
 
 app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor propoe, o medico decide.")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def conexao() -> Iterator[psycopg.Connection]:
