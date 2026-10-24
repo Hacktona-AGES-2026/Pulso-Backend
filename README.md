@@ -9,17 +9,34 @@ Not built yet: JEV in the pipeline, the monitoring agents, DECISOES.md (see [ide
 
 ## Run (clean machine)
 
-Needs Python 3.10+ and Docker.
+Needs Docker only.
+
+    docker compose up -d --build
+
+The first start takes about a minute: the `api` container waits for Postgres, then runs `python -m src.pipeline rodar --se-vazio` (CSVs -> cleaning -> events -> Postgres -> events one by one) and starts the API. On later starts the database is already loaded and the step is skipped.
+
+- API: http://localhost:8000/docs (CORS allows the frontend on http://localhost:5173 and :5174)
+- Follow the seeding: `docker compose logs -f api`
+- Reload the data from scratch (wipes the database, including decisions made): `docker compose exec api python -m src.pipeline rodar --recriar`
+- Reset everything, volume included: `docker compose down -v`
+- Frontend: see [../Pulso-Frontend](../Pulso-Frontend). Doctor login uses a CRM from `GET /medicos` (e.g. `CRM-RS 900001`) and any password with 4+ characters.
+
+Without Docker for the API (needs Python 3.10+; Postgres still comes from Docker):
 
     docker compose up -d db
     python3 -m venv .venv && . .venv/bin/activate
     pip install -r backend/requirements.txt
     cd backend
     python -m src.pipeline rodar --recriar     # CSVs -> cleaning -> events -> Postgres -> events one by one (~7 s)
+    # demo instead: load, then process events only until the doctor's inbox has 3 requests;
+    # the rest stay pending for the "process next event" button (POST /eventos/processar)
+    python -m src.pipeline carregar --recriar --ate-pedidos 3
     python -m src.pipeline exportar            # saida/fila_priorizada.csv
     python ../ideas/data/dataset/verificar_fila_priorizada.py saida/fila_priorizada.csv
     uvicorn src.main:app --reload              # API: http://localhost:8000/docs
     python -m pytest                           # uses a separate database, pulso_teste
+
+If the local `uvicorn` and the `api` container both run, they share port 8000 (one on IPv4, one on IPv6) and requests may hit either; run only one.
 
 ## Pipeline (backend/src/pipeline)
 
@@ -52,10 +69,6 @@ llama3.2, qwen3:4b and gemma3:4b passed the check but wrote wrong things it cann
 
 Generated texts are versioned in db/explicacoes.jsonl (input facts + text + model): `rodar --recriar` imports them, so a clone or a reload needs no LLM for this dataset.
 `explicar` updates the file; texts made on demand through the API are saved with `python -m src.pipeline salvar-explicacoes`.
-
-API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
-
-API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /maquina-tempo`, `GET /export/fila_priorizada.csv`.
 
 ### Máquina do Tempo (impacto medido)
 
