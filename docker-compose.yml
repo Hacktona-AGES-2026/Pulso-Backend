@@ -24,6 +24,10 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://pulso:pulso@db:5432/pulso
+      # O Ollama roda na maquina, fora do container: explicacoes sem cache sao geradas na hora
+      PULSO_LLM_URL: http://host.docker.internal:11434/v1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     volumes:
