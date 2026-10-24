@@ -59,7 +59,9 @@ def _para_float(v):
 
 
 def limpar(fila: pd.DataFrame, eventos: pd.DataFrame, procs: pd.DataFrame,
-           data_referencia: pd.Timestamp) -> Limpeza:
+           data_referencia: pd.Timestamp, saidas_por_evento: bool = True) -> Limpeza:
+    """saidas_por_evento=False: so as observacoes tiram da fila aqui; os eventos de saida
+    ficam para o processamento evento a evento (backend/src/pipeline), que pede aprovacao."""
     ref = pd.Timestamp(data_referencia)
     f = fila.copy()
     r = Limpeza(solicitacoes=f, eventos=eventos)
@@ -111,8 +113,9 @@ def limpar(fila: pd.DataFrame, eventos: pd.DataFrame, procs: pd.DataFrame,
     r.anotar("intensidade_dor_eva fora de 0..10", fora.sum(), "esvaziada e registrada")
 
     # textos normalizados (originais preservados para exibicao)
-    f["txt_justificativa"] = f.get("justificativa_clinica", "").map(normalizar)
-    f["txt_observacoes"] = f.get("observacoes", "").map(normalizar)
+    # campo vazio chega como NaN: sem o fillna vira o texto "nan"
+    f["txt_justificativa"] = f.get("justificativa_clinica", pd.Series("", index=f.index)).fillna("").map(normalizar)
+    f["txt_observacoes"] = f.get("observacoes", pd.Series("", index=f.index)).fillna("").map(normalizar)
 
     f["dias_em_fila"] = (ref - f["data_entrada_fila"]).dt.days
 
@@ -169,7 +172,7 @@ def limpar(fila: pd.DataFrame, eventos: pd.DataFrame, procs: pd.DataFrame,
     r.anotar("eventos em quarentena", len(r.quarentena), "guardados com o motivo")
 
     # ------------------------------------------------------------------ saida da fila
-    _marcar_saidas(f, r.eventos, r, ref)
+    _marcar_saidas(f, r.eventos if saidas_por_evento else r.eventos.iloc[0:0], r, ref)
 
     # ------------------------------------------------------------------ irma_com_evento
     f["irma_com_evento"] = _irmas_com_evento(f, r.eventos)
