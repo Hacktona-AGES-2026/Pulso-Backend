@@ -141,13 +141,20 @@ CREATE INDEX evento_solicitacao_data_idx ON evento_clinico (solicitacao_id, data
 
 -- Saída ----------------------------------------------------------------------
 
--- O entregável do case: uma linha por solicitação ativa, com posição e justificativa
+-- Uma linha por solicitação ativa. O entregável do case (fila_priorizada.csv) é
+-- solicitacao_id, posicao_final AS posicao, justificativa.
+--   posicao_inicial: ordem do método atual (prioridade manual, depois data de entrada),
+--                    preenchida pelo seed; é a base do "antes e depois"
+--   posicao_final:   ordem do Pulso, preenchida pelo motor junto com a justificativa
 CREATE TABLE fila_priorizada (
-    solicitacao_id text        PRIMARY KEY REFERENCES solicitacao (id),
-    posicao        integer     NOT NULL UNIQUE CHECK (posicao > 0),
-    justificativa  text        NOT NULL CHECK (justificativa <> ''),
-    classe_swalis  text        REFERENCES swalis_classe (classe),
-    gerada_em      timestamptz NOT NULL DEFAULT now()
+    solicitacao_id  text        PRIMARY KEY REFERENCES solicitacao (id),
+    posicao_inicial integer     NOT NULL UNIQUE CHECK (posicao_inicial > 0),
+    posicao_final   integer     UNIQUE CHECK (posicao_final > 0),
+    justificativa   text        CHECK (justificativa <> ''),
+    classe_swalis   text        REFERENCES swalis_classe (classe),
+    gerada_em       timestamptz NOT NULL DEFAULT now(),
+
+    CHECK ((posicao_final IS NULL) = (justificativa IS NULL))
 );
 
 -- Fila ativa com os campos derivados que a priorização usa o tempo todo.

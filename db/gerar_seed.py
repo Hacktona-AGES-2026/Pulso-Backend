@@ -263,6 +263,15 @@ def main():
                          [[ev['evento_id'], ev['solicitacao_id'], ev['data_evento'], ev['tipo_evento'],
                            ev['resultado'], decimal(ev['valor_numerico']), ev['descricao'], ev['origem']]
                           for ev in eventos_ok]))
+        # Ordem de hoje, descrita no case: prioridade manual e, dentro dela, data de entrada
+        out.write('-- posicao_inicial = método atual: prioridade manual (alta, media, baixa, vazia),\n'
+                  '-- depois data de entrada. posicao_final e justificativa ficam para o motor.\n'
+                  'INSERT INTO fila_priorizada (solicitacao_id, posicao_inicial)\n'
+                  'SELECT id, row_number() OVER (\n'
+                  "           ORDER BY CASE prioridade_regulacao WHEN 'alta' THEN 1 WHEN 'media' THEN 2\n"
+                  "                                              WHEN 'baixa' THEN 3 ELSE 4 END,\n"
+                  '                    data_entrada_fila, id)\n'
+                  "FROM solicitacao WHERE status = 'ativa';\n\n")
         out.write('COMMIT;\n')
 
     print(f'{args.saida}: {len(solicitacoes)} solicitações {dict(contagem)}, {len(pacientes)} pacientes, '

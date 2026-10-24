@@ -29,9 +29,26 @@ python db/gerar_seed.py
 | `paciente` | 907 | `fila_cirurgica.csv` (dados do paciente) |
 | `solicitacao` | 941 | `fila_cirurgica.csv` (uma linha por pedido de cirurgia) |
 | `evento_clinico` | 1.490 | `eventos_clinicos.csv` |
-| `fila_priorizada` | 0 | saída do motor: posição + justificativa (o entregável do case) |
+| `fila_priorizada` | 897 | uma linha por solicitação ativa: posição antes e depois do Pulso + justificativa |
 
 A view `solicitacao_ativa` traz só as solicitações ativas (897), com `dias_em_fila` e `oncologico` (CID começando com C) já calculados a partir da data de referência, 23/10/2026.
+
+### `fila_priorizada`
+
+| Coluna | O que é | Quem preenche |
+| --- | --- | --- |
+| `posicao_inicial` | posição pelo método atual: prioridade manual (alta, media, baixa, vazia) e, dentro dela, data de entrada | o seed |
+| `posicao_final` | posição depois do Pulso | o motor |
+| `justificativa` | motivo da posição final | o motor, junto com a `posicao_final` |
+
+O entregável do case sai direto daqui:
+
+```sql
+SELECT solicitacao_id, posicao_final AS posicao, justificativa
+FROM fila_priorizada ORDER BY posicao_final;
+```
+
+`posicao_inicial - posicao_final` é quantas posições o paciente subiu com o Pulso.
 
 ## Decisões de limpeza
 

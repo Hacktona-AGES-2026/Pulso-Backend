@@ -3434,4 +3434,13 @@ INSERT INTO evento_clinico (id, solicitacao_id, data_evento, tipo_evento, result
   ('EVT-001504', 'SOL-2026-00869', '2026-10-22', 'exame_imagem', 'estavel', NULL, 'TC de estadiamento sem metastases.', 'radiologia'),
   ('EVT-001505', 'SOL-2026-00957', '2026-10-22', 'pronto_socorro', 'atendido_liberado', NULL, 'Atendimento em PS por colica biliar / colecistite.', 'UPA Lomba do Pinheiro');
 
+-- posicao_inicial = método atual: prioridade manual (alta, media, baixa, vazia),
+-- depois data de entrada. posicao_final e justificativa ficam para o motor.
+INSERT INTO fila_priorizada (solicitacao_id, posicao_inicial)
+SELECT id, row_number() OVER (
+           ORDER BY CASE prioridade_regulacao WHEN 'alta' THEN 1 WHEN 'media' THEN 2
+                                              WHEN 'baixa' THEN 3 ELSE 4 END,
+                    data_entrada_fila, id)
+FROM solicitacao WHERE status = 'ativa';
+
 COMMIT;
