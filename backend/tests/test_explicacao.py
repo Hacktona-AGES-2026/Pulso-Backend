@@ -116,6 +116,18 @@ def test_fatos_do_paciente_trazem_fila_espera_e_eventos(con):
     assert template.startswith("G2 Oncologico confirmado")
 
 
+def test_cache_salvo_em_arquivo_volta_depois_de_apagar(con, tmp_path):
+    mid = _pedido(con)
+    ex.explicar(con, "mudanca", mid, LLMFalso(BOM))
+    arquivo, n = ex.salvar_cache(con, tmp_path / "explicacoes.jsonl")
+    assert n >= 1
+    con.execute("DELETE FROM explicacao")
+    assert ex.em_cache(con, "mudanca", mid) is None
+    assert ex.importar_cache(con, arquivo) == n
+    nenhum = LLMFalso()
+    assert ex.explicar(con, "mudanca", mid, nenhum)["texto"] == BOM["texto"] and nenhum.chamadas == 0
+
+
 # ---------------------------------------------------------------------------- API
 @pytest.fixture
 def api_falsa(banco):

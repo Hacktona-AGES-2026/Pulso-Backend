@@ -50,6 +50,9 @@ gemma4:e2b about 2 s per text, more mistakes, most of them caught by the check a
 llama3.2, qwen3:4b and gemma3:4b passed the check but wrote wrong things it cannot see (position read as a group, "no pending items" when there were, CID attached to the wrong diagnosis).
     python -m src.pipeline exportar --explicacao            # justificativa = LLM text where generated
 
+Generated texts are versioned in db/explicacoes.jsonl (input facts + text + model): `rodar --recriar` imports them, so a clone or a reload needs no LLM for this dataset.
+`explicar` updates the file; texts made on demand through the API are saved with `python -m src.pipeline salvar-explicacoes`.
+
 API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
 
 API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.

@@ -28,6 +28,8 @@ DATASET = Path(os.getenv("PULSO_DATASET", RAIZ / "ideas" / "data" / "dataset"))
 # "Hoje" do dataset. Eventos sao avaliados em max(data de referencia, data do evento).
 DATA_REFERENCIA = os.getenv("PULSO_DATA_REFERENCIA", "2026-10-23")
 SCHEMA = RAIZ / "db" / "schema.sql"
+# Textos do LLM ja gerados (versionado): a carga importa, `explicar` grava. Vazio = desligado.
+EXPLICACOES = os.getenv("PULSO_EXPLICACOES", str(RAIZ / "db" / "explicacoes.jsonl")) or None
 
 # Codigo dos colegas que o pipeline usa sem copiar:
 #   fila_cirurgica/priorizacao   motor (limpeza, sinais, triagem, classificadores)

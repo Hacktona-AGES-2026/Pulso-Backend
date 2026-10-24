@@ -8,6 +8,7 @@
   python -m src.pipeline aprovar-todas --medico 1 (demo/teste: fila oficial = recomendada)
   python -m src.pipeline varrer [--data AAAA-MM-DD]
   python -m src.pipeline explicar mudancas|fila [--limite N|0=todos] [--paralelo 4]   texto claro pelo LLM
+  python -m src.pipeline salvar-explicacoes     grava os textos do LLM em db/explicacoes.jsonl (a carga importa)
   python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv] [--explicacao]
   python -m src.pipeline resumo
 """
@@ -48,6 +49,7 @@ def main(argv=None) -> int:
     p.add_argument("alvo", choices=["mudancas", "fila"])
     p.add_argument("--limite", type=int, default=10, help="0 = todos")
     p.add_argument("--paralelo", type=int, default=4, help="chamadas ao LLM ao mesmo tempo")
+    sub.add_parser("salvar-explicacoes", help="grava os textos aceitos em db/explicacoes.jsonl")
     p = sub.add_parser("exportar")
     p.add_argument("--modo", default="recomendada", choices=["recomendada", "oficial"])
     p.add_argument("--saida", default="saida/fila_priorizada.csv")
@@ -83,6 +85,8 @@ def main(argv=None) -> int:
             _imprimir("varredura", processamento.varrer(con, a.data))
         elif a.cmd == "explicar":
             _explicar(con, a.alvo, a.limite, a.paralelo)
+        elif a.cmd == "salvar-explicacoes":
+            _salvar_explicacoes(con)
         elif a.cmd == "exportar":
             print(consultas.exportar(con, a.saida, a.modo, a.explicacao))
         elif a.cmd == "resumo":
@@ -124,6 +128,12 @@ def _explicar(con, alvo: str, limite: int, paralelo: int) -> None:
             elif k % 25 == 0 or k == len(ids):
                 print(f"{k}/{len(ids)}  {time.time() - t0:.0f} s  {contagem}", flush=True)
     print(f"\n{contagem}  ({(time.time() - t0) / max(1, len(ids)):.1f} s por texto)")
+    _salvar_explicacoes(con)
+
+
+def _salvar_explicacoes(con) -> None:
+    r = explicacao.salvar_cache(con)
+    print(f"{r[1]} textos em {r[0]}" if r else "PULSO_EXPLICACOES vazio: nada gravado")
 
 
 def _imprimir(titulo, d) -> None:

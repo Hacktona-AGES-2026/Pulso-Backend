@@ -12,12 +12,15 @@ Cache em `explicacao`, chaveado pelo hash dos fatos: os mesmos fatos dao o mesmo
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unicodedata
 from datetime import date
+from pathlib import Path
 
 import psycopg
 
+from .. import config
 from ..llm import LLM, LLMIndisponivel
 from priorizacao import config as regras
 
@@ -325,3 +328,36 @@ def explicar(con: psycopg.Connection, alvo: str, alvo_id, llm: LLM | None = None
                 "modelo": llm.modelo, "motivo": "; ".join(problemas), "texto_recusado": texto}
     return {**base, "texto": texto, "fonte": "llm", "em_cache": False, "provedor": llm.provedor,
             "modelo": llm.modelo, "latencia_s": latencia, "tentativas": n}
+
+
+# ---------------------------------------------------------------------------- cache em arquivo
+_CAMPOS = ("alvo", "alvo_id", "hash_fatos", "provedor", "modelo", "texto", "fatos", "tentativas", "latencia_s")
+
+
+def salvar_cache(con: psycopg.Connection, caminho=None) -> tuple[Path, int] | None:
+    """Grava os textos aceitos em db/explicacoes.jsonl (versionado), em ordem estavel.
+    A carga (`rodar --recriar`) importa de volta: ninguem precisa gerar de novo."""
+    caminho = caminho or config.EXPLICACOES
+    if not caminho:
+        return None
+    linhas = con.execute(f"""SELECT {", ".join(_CAMPOS)} FROM explicacao WHERE status = 'ok'
+                             ORDER BY alvo, alvo_id, hash_fatos, provedor, modelo""").fetchall()
+    caminho = Path(caminho)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_text("".join(json.dumps(x, ensure_ascii=False, sort_keys=True) + "\n" for x in linhas),
+                       encoding="utf-8")
+    return caminho, len(linhas)
+
+
+def importar_cache(con: psycopg.Connection, caminho=None) -> int:
+    """Le db/explicacoes.jsonl para a tabela. Texto de fatos antigos fica la sem efeito (o hash nao bate)."""
+    caminho = caminho or config.EXPLICACOES
+    if not caminho or not Path(caminho).exists():
+        return 0
+    linhas = [json.loads(x) for x in Path(caminho).read_text(encoding="utf-8").splitlines() if x.strip()]
+    con.cursor().executemany(
+        """INSERT INTO explicacao (alvo, alvo_id, hash_fatos, provedor, modelo, texto, fatos, tentativas,
+           latencia_s, status) VALUES (%(alvo)s, %(alvo_id)s, %(hash_fatos)s, %(provedor)s, %(modelo)s, %(texto)s,
+           %(fatos)s, %(tentativas)s, %(latencia_s)s, 'ok')
+           ON CONFLICT (alvo, alvo_id, hash_fatos, provedor, modelo) DO NOTHING""", linhas)
+    return len(linhas)
