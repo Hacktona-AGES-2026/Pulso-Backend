@@ -19,6 +19,7 @@ import psycopg
 
 from .. import config, db
 from ..db import Jsonb
+from . import explicacao
 from .avaliacao import CLASSE_SWALIS, avaliar
 from .fila import conferir_regra_de_ouro, renumerar
 from .processamento import estado_params
@@ -72,13 +73,14 @@ def carregar(con: psycopg.Connection, dataset=None, data_referencia=None, recria
               Jsonb(json.loads(q["registro_json"])), exec_id) for q in lp.quarentena])
         filas = _fila_inicial(con, lp.solicitacoes, ref)
         n_features = _features(con, dataset, ref)
+        n_explicacoes = explicacao.importar_cache(con)
         con.execute("UPDATE execucao SET terminada_em = now() WHERE id = %s", (exec_id,))
 
     st = lp.solicitacoes["status"].value_counts().to_dict()
     return {"execucao": exec_id, "data_referencia": str(ref.date()), "solicitacoes": len(lp.solicitacoes),
             "status": {k: int(v) for k, v in st.items()}, "eventos_pendentes": len(eventos),
             "eventos_repetidos_descartados": lp.descartados_duplicados, "quarentena": len(lp.quarentena),
-            "fila_inicial": filas, "features": n_features}
+            "fila_inicial": filas, "features": n_features, "explicacoes_importadas": n_explicacoes}
 
 
 # ---------------------------------------------------------------------------- 3. eventos

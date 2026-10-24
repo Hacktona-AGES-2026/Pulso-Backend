@@ -36,6 +36,25 @@ Needs Python 3.10+ and Docker.
 - fila_recomendada (view) is the queue as if every request were approved; `exportar` writes it by default (`--modo oficial` for the official one). It matches the batch engine position by position (test_recomendada_igual_ao_lote_do_motor).
 - Engine (groups G1a-G7, signals, negation, classifiers): [fila_cirurgica/README.md](fila_cirurgica/README.md). Database: [db/README.md](db/README.md). build_features.py fills features_paciente (for JEV and the patient detail).
 
+### Plain-language explanations (LLM, optional)
+
+backend/src/pipeline/explicacao.py: an LLM rewrites the engine's facts (group, deadline, wait, evidence with dates and quotes, alerts, pending items, request waiting for the doctor) into 2-3 sentences. It never changes the queue.
+After every answer a deterministic check rejects any number or date, group code or name, or oncology term that is not in the facts, and "no pending items/alerts" when the facts list some; one retry with the reason, then the template text stands. Texts are cached in `explicacao` by a hash of the facts (same facts, same text; a new event regenerates it).
+
+    OLLAMA_NUM_PARALLEL=4 ollama serve && ollama pull gemma4:e4b   # local (default); or PULSO_LLM_PROVIDER=groq + GROQ_API_KEY
+    python -m src.pipeline explicar mudancas --limite 0    # whole doctor's inbox (128 requests, ~8 min)
+    python -m src.pipeline explicar fila --limite 50       # top of the queue (--limite 0 = all 897, ~1 h)
+
+Model (local, at most 4B, same 16-text sample, M3 Pro): gemma4:e4b (default, 4B effective) about 4 s per text with 4 in parallel and the fewest mistakes;
+gemma4:e2b about 2 s per text, more mistakes, most of them caught by the check and fixed on the retry (`PULSO_LLM_MODEL=gemma4:e2b`).
+llama3.2, qwen3:4b and gemma3:4b passed the check but wrote wrong things it cannot see (position read as a group, "no pending items" when there were, CID attached to the wrong diagnosis).
+    python -m src.pipeline exportar --explicacao            # justificativa = LLM text where generated
+
+Generated texts are versioned in db/explicacoes.jsonl (input facts + text + model): `rodar --recriar` imports them, so a clone or a reload needs no LLM for this dataset.
+`explicar` updates the file; texts made on demand through the API are saved with `python -m src.pipeline salvar-explicacoes`.
+
+API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
+
 API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.
 
 ## Deliverables checklist

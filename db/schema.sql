@@ -12,7 +12,7 @@
 BEGIN;
 
 DROP VIEW IF EXISTS solicitacao_ativa, fila_recomendada;
-DROP TABLE IF EXISTS fila_historico, solicitacao_mudanca, estado_paciente, features_paciente,
+DROP TABLE IF EXISTS explicacao, fila_historico, solicitacao_mudanca, estado_paciente, features_paciente,
     evento_quarentena, execucao, fila_priorizada, evento_clinico, solicitacao, paciente,
     medico, procedimento, hospital, especialidade, swalis_classe, fila_grupo CASCADE;
 
@@ -290,6 +290,28 @@ CREATE TABLE fila_historico (
     para_posicao   integer,
     medico_id      integer     NOT NULL REFERENCES medico (id),
     registrado_em  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Texto em linguagem clara escrito por um LLM a partir dos fatos do motor (backend/src/pipeline/explicacao.py).
+-- Nunca muda a fila. Chave = hash dos fatos: os mesmos fatos dão o mesmo texto; um evento novo gera outro.
+-- rejeitada: o texto citou número, data, fila ou termo oncológico que não está nos fatos (vale o template).
+CREATE TABLE explicacao (
+    id              integer     GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    alvo            text        NOT NULL CHECK (alvo IN ('solicitacao', 'mudanca')),
+    alvo_id         text        NOT NULL,
+    hash_fatos      text        NOT NULL,
+    fatos           text        NOT NULL,
+    status          text        NOT NULL CHECK (status IN ('ok', 'rejeitada')),
+    texto           text,
+    motivo_rejeicao text,
+    provedor        text        NOT NULL,
+    modelo          text        NOT NULL,
+    tentativas      smallint    NOT NULL,
+    latencia_s      real,
+    criada_em       timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE (alvo, alvo_id, hash_fatos, provedor, modelo),
+    CHECK ((status = 'ok') = (texto IS NOT NULL))
 );
 
 -- Fila que o motor recomenda com tudo o que já foi processado (como se todos os pedidos

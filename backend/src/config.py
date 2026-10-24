@@ -21,12 +21,15 @@ def _carregar_env(arquivo: Path) -> None:
 
 
 _carregar_env(BACKEND / ".env")
+_carregar_env(RAIZ / ".env")  # chaves de LLM que o time ja guarda na raiz (git-ignored)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://pulso:pulso@localhost:5432/pulso")
 DATASET = Path(os.getenv("PULSO_DATASET", RAIZ / "ideas" / "data" / "dataset"))
 # "Hoje" do dataset. Eventos sao avaliados em max(data de referencia, data do evento).
 DATA_REFERENCIA = os.getenv("PULSO_DATA_REFERENCIA", "2026-10-23")
 SCHEMA = RAIZ / "db" / "schema.sql"
+# Textos do LLM ja gerados (versionado): a carga importa, `explicar` grava. Vazio = desligado.
+EXPLICACOES = os.getenv("PULSO_EXPLICACOES", str(RAIZ / "db" / "explicacoes.jsonl")) or None
 
 # Codigo dos colegas que o pipeline usa sem copiar:
 #   fila_cirurgica/priorizacao   motor (limpeza, sinais, triagem, classificadores)
