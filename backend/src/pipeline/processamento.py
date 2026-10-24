@@ -59,6 +59,29 @@ def processar_pendentes(con: psycopg.Connection, limite: int | None = None, data
     return contagem
 
 
+def processar_ate_pedidos(con: psycopg.Connection, pedidos: int, data_referencia=None) -> dict:
+    """Processa eventos em ordem ate a caixa do medico ter `pedidos` pendentes (ou os eventos acabarem).
+
+    Para a demo: a revisao humana comeca com alguns pedidos e o resto dos eventos fica pendente
+    para ser processado um a um pela API (POST /eventos/processar).
+    """
+    contagem = {"eventos": 0, "aberta": 0, "atualizada": 0, "obsoleta": 0, "sem_mudanca": 0}
+    while _pedidos_pendentes(con) < pedidos:
+        r = processar_pendentes(con, 1, data_referencia)
+        if r["eventos"] == 0:
+            break
+        for k in ("eventos", "aberta", "atualizada", "obsoleta", "sem_mudanca"):
+            contagem[k] += r[k]
+    contagem["pendentes"] = con.execute(
+        "SELECT count(*) AS n FROM evento_clinico WHERE processado_em IS NULL").fetchone()["n"]
+    contagem["pedidos_pendentes"] = _pedidos_pendentes(con)
+    return contagem
+
+
+def _pedidos_pendentes(con: psycopg.Connection) -> int:
+    return con.execute("SELECT count(*) AS n FROM solicitacao_mudanca WHERE status = 'pendente'").fetchone()["n"]
+
+
 def processar_evento(con: psycopg.Connection, evento_id: str, data_referencia=None) -> dict | None:
     """Processa um evento (transacao propria). Devolve o que aconteceu com o pedido de mudanca."""
     with con.transaction():

@@ -2,7 +2,9 @@
 
   python -m src.pipeline rodar --recriar          passos 1-5: CSVs -> limpeza -> eventos -> banco -> processamento
   python -m src.pipeline carregar --recriar       so 1-4 (eventos ficam pendentes)
-  python -m src.pipeline processar [--limite N]   tira N eventos da fila de processamento
+  python -m src.pipeline carregar --recriar --ate-pedidos 3
+                                                  1-4 e processa eventos ate haver 3 pedidos para o medico (demo)
+  python -m src.pipeline processar [--limite N | --ate-pedidos N]   tira eventos da fila de processamento
   python -m src.pipeline mudancas [--status pendente]
   python -m src.pipeline decidir ID aprovar|rejeitar --medico 1 [--motivo "..."]
   python -m src.pipeline aprovar-todas --medico 1 (demo/teste: fila oficial = recomendada)
@@ -32,8 +34,12 @@ def main(argv=None) -> int:
         p.add_argument("--se-vazio", action="store_true", help="carrega so se o banco ainda estiver vazio (docker compose up)")
         p.add_argument("--dataset")
         p.add_argument("--data-referencia")
+    sub.choices["carregar"].add_argument(
+        "--ate-pedidos", type=int, metavar="N",
+        help="depois da carga, processa eventos ate a caixa do medico ter N pedidos pendentes")
     p = sub.add_parser("processar")
     p.add_argument("--limite", type=int)
+    p.add_argument("--ate-pedidos", type=int, metavar="N", help="processa ate haver N pedidos pendentes")
     p = sub.add_parser("mudancas")
     p.add_argument("--status", default="pendente")
     p.add_argument("--limite", type=int, default=20)
@@ -70,8 +76,13 @@ def main(argv=None) -> int:
             if a.cmd == "rodar":
                 _imprimir("processamento (passo 5)", processamento.processar_pendentes(con))
                 _imprimir_resumo(consultas.resumo(con))
+            elif a.ate_pedidos:
+                _imprimir("processamento (ate pedidos)", processamento.processar_ate_pedidos(con, a.ate_pedidos))
         elif a.cmd == "processar":
-            _imprimir("processamento", processamento.processar_pendentes(con, a.limite))
+            if a.ate_pedidos:
+                _imprimir("processamento", processamento.processar_ate_pedidos(con, a.ate_pedidos))
+            else:
+                _imprimir("processamento", processamento.processar_pendentes(con, a.limite))
         elif a.cmd == "mudancas":
             for m in consultas.mudancas(con, None if a.status == "todas" else a.status, a.limite):
                 print(f"#{m['id']:<5} {m['status']:<10} {m['tipo']:<6} {m['solicitacao_id']}  "

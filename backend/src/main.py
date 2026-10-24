@@ -8,6 +8,8 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Literal
 
+import os
+
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,11 +22,12 @@ from .pipeline import consultas, explicacao, fila as fila_oficial, processamento
 
 app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor propoe, o medico decide.")
 
+# Frontend (Vite) roda em outra porta. Origens separadas por virgula em PULSO_CORS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=os.getenv("PULSO_CORS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -134,6 +137,21 @@ def novo_evento(ev: NovoEvento, con=Depends(conexao)):
 def processar(limite: int = Query(1, ge=1, le=5000), con=Depends(conexao)):
     """Tira os proximos `limite` eventos pendentes da fila de processamento (demo passo a passo)."""
     return processamento.processar_pendentes(con, limite)
+
+
+@app.get("/pendencias")
+def pendencias(con=Depends(conexao)):
+    return consultas.pendencias(con)
+
+
+@app.get("/marcacoes")
+def marcacoes(severidade: Literal["alta", "media", "baixa", "informativa"] | None = None, con=Depends(conexao)):
+    return consultas.marcacoes(con, severidade)
+
+
+@app.get("/dados")
+def dados(con=Depends(conexao)):
+    return consultas.dados(con)
 
 
 @app.get("/medicos")

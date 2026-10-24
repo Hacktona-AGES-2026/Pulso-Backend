@@ -27,7 +27,10 @@ Without Docker for the API (needs Python 3.10+; Postgres still comes from Docker
     python3 -m venv .venv && . .venv/bin/activate
     pip install -r backend/requirements.txt
     cd backend
-    python -m src.pipeline rodar --recriar     # same seeding, ~1 min
+    python -m src.pipeline rodar --recriar     # CSVs -> cleaning -> events -> Postgres -> events one by one (~7 s)
+    # demo instead: load, then process events only until the doctor's inbox has 3 requests;
+    # the rest stay pending for the "process next event" button (POST /eventos/processar)
+    python -m src.pipeline carregar --recriar --ate-pedidos 3
     python -m src.pipeline exportar            # saida/fila_priorizada.csv
     python ../ideas/data/dataset/verificar_fila_priorizada.py saida/fila_priorizada.csv
     uvicorn src.main:app --reload              # API: http://localhost:8000/docs
@@ -69,7 +72,9 @@ Generated texts are versioned in db/explicacoes.jsonl (input facts + text + mode
 
 API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
 
-API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.
+API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`, `GET /pendencias` (operational to-dos), `GET /marcacoes?severidade=alta|media|baixa|informativa` (engine flags), `GET /dados` (load report, quarantine, requests out of the queue).
+
+The queue and the change inbox include patient name, age and procedure, so the frontend ([Pulso-Frontend](../Pulso-Frontend)) does not need extra calls. CORS allows `http://localhost:5173` by default; set `PULSO_CORS` (comma-separated origins) for other hosts.
 
 ## Deliverables checklist
 
