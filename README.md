@@ -16,6 +16,9 @@ Needs Python 3.10+ and Docker.
     pip install -r backend/requirements.txt
     cd backend
     python -m src.pipeline rodar --recriar     # CSVs -> cleaning -> events -> Postgres -> events one by one (~7 s)
+    # demo instead: load, then process events only until the doctor's inbox has 3 requests;
+    # the rest stay pending for the "process next event" button (POST /eventos/processar)
+    python -m src.pipeline carregar --recriar --ate-pedidos 3
     python -m src.pipeline exportar            # saida/fila_priorizada.csv
     python ../ideas/data/dataset/verificar_fila_priorizada.py saida/fila_priorizada.csv
     uvicorn src.main:app --reload              # API: http://localhost:8000/docs
