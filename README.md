@@ -109,9 +109,9 @@ API: `GET /maquina-tempo` serve a mesma manchete (em cache; o dataset é estáti
 
 ## Entregáveis
 
-- [ ] Repositório público com o histórico de commits do evento (até as 18h de sábado, 24/10)
-- [ ] Este README roda a solução numa máquina limpa
-- [ ] DECISOES.md: abordagem, usuário principal, por quê, o que ficou de fora de propósito
-- [ ] Solução funcionando sobre o dataset completo
-- [ ] fila_priorizada.csv (solicitacao_id, posicao, justificativa), passando em `python ideas/data/dataset/verificar_fila_priorizada.py fila_priorizada.csv` (meta: 14h)
+- [X] Repositório público com o histórico de commits do evento (até as 18h de sábado, 24/10)
+- [X] Este README roda a solução numa máquina limpa
+- [X] DECISOES.md: abordagem, usuário principal, por quê, o que ficou de fora de propósito
+- [X] Solução funcionando sobre o dataset completo
+- [X] fila_priorizada.csv (solicitacao_id, posicao, justificativa), passando em `python ideas/data/dataset/verificar_fila_priorizada.py fila_priorizada.csv` (meta: 14h)
 - [ ] Pitch de 5 minutos às 19h
