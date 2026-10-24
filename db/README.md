@@ -4,12 +4,25 @@ Schema essencial para o Desafio 1: a fila cirúrgica e os eventos do dataset com
 
 ## Como carregar
 
+O caminho principal é o pipeline do backend: aplica este schema, lê os CSVs, limpa (limpeza de `fila_cirurgica/priorizacao`), carrega e processa os eventos um por um (README da raiz):
+
+```bash
+docker compose up -d db
+cd backend && python -m src.pipeline rodar --recriar
+```
+
+Só o SQL, sem o motor (dados limpos, sem fila calculada):
+
 ```bash
 createdb pulso
 psql -d pulso -f db/schema.sql -f db/seed.sql
 ```
 
-O `schema.sql` apaga e recria as tabelas, então dá para rodar de novo quando quiser.
+O `schema.sql` apaga e recria as tabelas, então dá para rodar de novo quando quiser. Os médicos e os solicitantes sorteados são os mesmos nos dois caminhos (mesma semente).
+
+Tabelas do pipeline (preenchidas só pelo backend): `fila_grupo` (as 8 filas do motor, cada uma ligada a uma classe SWALIS), `execucao`, `evento_quarentena`, `estado_paciente` (o que o motor recomenda para cada ativa), `solicitacao_mudanca` (pedidos para o médico aprovar), `fila_historico`, `features_paciente` e a view `fila_recomendada`. Em `evento_clinico`, `processado_em` vazio = evento ainda na fila de processamento.
+
+Diferenças da limpeza do pipeline para o `gerar_seed.py`: os eventos são deduplicados depois de fundir as duplicatas e sem olhar a origem (7 em vez de 6: `EVT-000712` e `EVT-000713` são PS no mesmo dia com a mesma descrição, só a origem muda; contam uma vez); as saídas por evento (5) entram como pedido `sair` para o médico aprovar em vez de sair direto.
 
 Para regerar o `seed.sql` depois de mudar os CSVs ou as regras de limpeza (só usa a biblioteca padrão do Python):
 
