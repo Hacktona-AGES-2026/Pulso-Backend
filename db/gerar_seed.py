@@ -94,6 +94,26 @@ def insert(tabela, colunas, linhas):
     return cabecalho + corpo + ';\n\n'
 
 
+def gerar_medicos(especialidades, esp_id, rng):
+    """2 médicos sintéticos por especialidade. Também usado pela carga do backend
+    (backend/src/pipeline/carga.py), para os dois gerarem os mesmos médicos."""
+    medicos = []
+    nomes_usados = set()
+    medicos_por_esp = defaultdict(list)
+    for nome_esp in especialidades:
+        for i in range(MEDICOS_POR_ESPECIALIDADE):
+            while True:
+                nome = f'{rng.choice(PRENOMES)} {rng.choice(SOBRENOMES)}'
+                if nome not in nomes_usados:
+                    nomes_usados.add(nome)
+                    break
+            medico_id = len(medicos) + 1
+            hospital_id = 1 if i == 0 else 2 + (esp_id[nome_esp] % (len(HOSPITAIS) - 1))
+            medicos.append((nome, f'CRM-RS {900000 + medico_id}', esp_id[nome_esp], hospital_id))
+            medicos_por_esp[esp_id[nome_esp]].append(medico_id)
+    return medicos, medicos_por_esp
+
+
 def main():
     ap = argparse.ArgumentParser()
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -113,20 +133,7 @@ def main():
     proc_esp = {p['procedimento_id']: esp_id[p['especialidade']] for p in procs}
 
     # Hospitais e médicos (sintéticos) ------------------------------------------
-    medicos = []
-    nomes_usados = set()
-    medicos_por_esp = defaultdict(list)
-    for nome_esp in especialidades:
-        for i in range(MEDICOS_POR_ESPECIALIDADE):
-            while True:
-                nome = f'{rng.choice(PRENOMES)} {rng.choice(SOBRENOMES)}'
-                if nome not in nomes_usados:
-                    nomes_usados.add(nome)
-                    break
-            medico_id = len(medicos) + 1
-            hospital_id = 1 if i == 0 else 2 + (esp_id[nome_esp] % (len(HOSPITAIS) - 1))
-            medicos.append((nome, f'CRM-RS {900000 + medico_id}', esp_id[nome_esp], hospital_id))
-            medicos_por_esp[esp_id[nome_esp]].append(medico_id)
+    medicos, medicos_por_esp = gerar_medicos(especialidades, esp_id, rng)
 
     # Normalização de município: a grafia mais comum entre as variações de caixa
     grafias = defaultdict(Counter)
