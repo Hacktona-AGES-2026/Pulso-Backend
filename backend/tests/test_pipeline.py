@@ -131,6 +131,18 @@ def test_api_evento_novo_abre_pedido_e_medico_aprova(api, con):
     assert r.status_code == 200, r.text
     d = api.get(f"/solicitacoes/{alvo['solicitacao_id']}").json()
     assert d["fila_oficial"]["fila"] == "G2" and d["fila_oficial"]["posicao"] < alvo["posicao_final"]
+
+
+def test_api_maquina_tempo(api):
+    r = api.get("/maquina-tempo")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    p = d["promocoes"]
+    assert d["ativas"] > 0
+    assert p["n_promovidos"] > 0
+    assert p["prioridade_baixa_ou_media"] <= p["n_promovidos"]
+    assert len(p["casos"]) == p["n_promovidos"]
+    assert set(p["dias_desde_promocao"]) >= {"mediana", "p25", "p75"}
     assert api.get("/resumo").json()["regra_de_ouro"]["fila_priorizada"]["ok"]
     csv = api.get("/export/fila_priorizada.csv", params={"modo": "oficial"}).text
     assert csv.startswith("solicitacao_id,posicao,justificativa")

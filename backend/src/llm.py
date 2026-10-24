@@ -2,6 +2,7 @@
 
   PULSO_LLM_PROVIDER  ollama (padrao, local) | groq | gemini | openrouter
   PULSO_LLM_MODEL     modelo do provedor (padrao na tabela abaixo)
+  PULSO_LLM_URL       endereco da API (no docker compose: o Ollama da maquina, via host.docker.internal)
   GROQ_API_KEY / GEMINI_API_KEY / OPENROUTER_API_KEY para os hospedados (backend/.env ou .env da raiz)
 
 Ollama local: `OLLAMA_NUM_PARALLEL=4 ollama serve` e `ollama pull gemma4:e4b` (4B efetivos, ~5 s por texto;
@@ -38,6 +39,7 @@ class LLM:
         if self.provedor not in PROVEDORES:
             raise LLMIndisponivel(f"provedor desconhecido: {self.provedor}")
         base_url, chave_env, modelo_padrao = PROVEDORES[self.provedor]
+        base_url = os.getenv("PULSO_LLM_URL", base_url)
         chave = os.getenv(chave_env) if chave_env else "ollama"
         if not chave:
             raise LLMIndisponivel(f"defina {chave_env} para usar {self.provedor}")

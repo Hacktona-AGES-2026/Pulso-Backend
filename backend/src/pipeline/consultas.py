@@ -52,7 +52,11 @@ def mudancas(con: psycopg.Connection, status: str | None = "pendente", limite: i
     """Caixa do medico: o destino mais urgente primeiro; saidas por ultimo."""
     return con.execute("""
         SELECT m.id, m.solicitacao_id, m.tipo, m.status, m.fila_atual, m.fila_proposta,
-               fp.posicao_final AS posicao_atual, m.posicao_proposta, m.motivo, m.evidencias,
+               fp.posicao_final AS posicao_atual, m.posicao_proposta,
+               -- posicao_proposta e "se so este pedido for aprovado" (gravada no evento); varios pedidos podem
+               -- cair na mesma. Esta e a posicao na fila recomendada de agora (todos aprovados), unica.
+               CASE WHEN m.status = 'pendente' THEN fr.posicao END AS posicao_recomendada,
+               m.motivo, m.evidencias,
                m.evento_id, m.oncologico, m.criada_em, m.atualizada_em, m.medico_id, m.decidida_em,
                m.motivo_decisao, pa.nome AS paciente_nome, pr.nome AS procedimento, md.nome AS medico_nome
         FROM solicitacao_mudanca m
@@ -62,6 +66,7 @@ def mudancas(con: psycopg.Connection, status: str | None = "pendente", limite: i
         LEFT JOIN medico md ON md.id = m.medico_id
         LEFT JOIN fila_grupo g ON g.codigo = m.fila_proposta
         LEFT JOIN fila_priorizada fp ON fp.solicitacao_id = m.solicitacao_id
+        LEFT JOIN fila_recomendada fr ON fr.solicitacao_id = m.solicitacao_id
         WHERE %(status)s::text IS NULL OR m.status = %(status)s
         ORDER BY coalesce(g.ordem, 99), m.posicao_proposta NULLS LAST, m.id
         LIMIT %(limite)s OFFSET %(offset)s""", {"status": status, "limite": limite, "offset": offset}).fetchall()

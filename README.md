@@ -70,11 +70,14 @@ llama3.2, qwen3:4b and gemma3:4b passed the check but wrote wrong things it cann
 Generated texts are versioned in db/explicacoes.jsonl (input facts + text + model): `rodar --recriar` imports them, so a clone or a reload needs no LLM for this dataset.
 `explicar` updates the file; texts made on demand through the API are saved with `python -m src.pipeline salvar-explicacoes`.
 
-API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
+### Máquina do Tempo (impacto medido)
 
-API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`, `GET /pendencias` (operational to-dos), `GET /marcacoes?severidade=alta|media|baixa|informativa` (engine flags), `GET /dados` (load report, quarantine, requests out of the queue).
+`fila_cirurgica/maquina_tempo/` (módulo irmão de `priorizacao`): rebobina o log de eventos e reavalia cada paciente a cada novo evento. Mede quantos pacientes o motor teria promovido de fila durante a espera e o gap com a prioridade manual. Determinístico, sem vazamento de futuro, não toca na fila oficial.
 
-The queue and the change inbox include patient name, age and procedure, so the frontend ([Pulso-Frontend](../Pulso-Frontend)) does not need extra calls. CORS allows `http://localhost:5173` by default; set `PULSO_CORS` (comma-separated origins) for other hosts.
+    cd fila_cirurgica && python -m maquina_tempo            # manchete + top casos
+    python -m maquina_tempo --caso SOL-2025-00478           # linha do tempo de 1 paciente
+
+API: `GET /maquina-tempo` serve a mesma manchete (em cache; o dataset é estático).
 
 ## Deliverables checklist
 
