@@ -24,10 +24,12 @@ from maquina_tempo import metricas as maquina_tempo
 
 app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor propoe, o medico decide.")
 
-# Frontend (Vite) roda em outra porta. Origens separadas por virgula em PULSO_CORS.
+# Frontend (Vite) roda em outra porta: 5173, ou 5174 quando a 5173 ja esta ocupada.
+# Origens separadas por virgula em PULSO_CORS.
+_CORS_PADRAO = ",".join(f"http://{h}:{p}" for h in ("localhost", "127.0.0.1") for p in (5173, 5174))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("PULSO_CORS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+    allow_origins=os.getenv("PULSO_CORS", _CORS_PADRAO).split(","),
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
