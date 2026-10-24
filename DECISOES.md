@@ -15,8 +15,8 @@ Priorização da fila de cirurgias eletivas (Desafio 1, 9ª Hackatona · Fin-x �
 
 | Usuário | O que faz no Pulso | Por quê |
 |---|---|---|
-| **Médico regulador** (principal) | Revisa a caixa de pedidos de mudança, aprova ou rejeita com motivo escrito e consulta a fila, o paciente e as pendências | É quem responde pela fila. O sistema propõe e ele decide; nenhuma mudança de nível acontece sem ele. |
-| Paciente (secundário) | Consulta só o próprio encaminhamento: nível, situação e prazo | Transparência sem expor a fila de terceiros. |
+| **Médico regulador** (principal) | Revisa a caixa de pedidos de mudança, aprova ou rejeita com motivo escrito e consulta a fila e cada paciente (com as marcações e pendências dele) | É quem responde pela fila. O sistema propõe e ele decide; nenhuma mudança de nível acontece sem ele. |
+| Paciente (secundário) | Consulta só o próprio encaminhamento: nível, posição na fila, situação e tempo de espera | Transparência sem expor a fila de terceiros. |
 
 ## Abordagem, por camada
 
@@ -34,7 +34,7 @@ Priorização da fila de cirurgias eletivas (Desafio 1, 9ª Hackatona · Fin-x �
 
 ### 2. Motor de priorização (`fila_cirurgica/priorizacao`)
 
-- **8 níveis**, adaptados do SWALIS, em ordem fixa. Cada nível tem um prazo:
+- **8 níveis**, adaptados do SWALIS, em ordem fixa (G1 se divide em G1a e G1b; para o paciente, os dois aparecem como "nível 1 de 7"). Cada nível tem um prazo:
 
   | Nível | Critério | Prazo |
   |---|---|---|
@@ -102,8 +102,8 @@ Priorização da fila de cirurgias eletivas (Desafio 1, 9ª Hackatona · Fin-x �
 
 ### 7. Frontend (`Pulso-Frontend`)
 
-- **Área profissional:** visão geral, fila, paciente, revisão humana (caixa de pedidos com evidências, explicação e posição estimada), pendências e dados. Lê e decide direto na API.
-- **Área pública:** o paciente consulta o próprio encaminhamento.
+- **Área profissional:** visão geral, fila, paciente (com marcações e pendências) e revisão humana (caixa de pedidos com evidências, explicação e posição estimada, e o botão "Processar até novo pedido", que lê os eventos um a um e para quando surge um pedido novo). Lê e decide direto na API.
+- **Área pública:** o paciente consulta o próprio encaminhamento (nível, posição na fila, situação e tempo de espera).
 - **`/pipeline`:** a página mostra o pipeline por dentro, com os dados reais (limpeza, motor, eventos, decisão, Máquina do Tempo, recibos).
 
 ## O que ficou de fora, de propósito
@@ -288,10 +288,10 @@ python -m src.pipeline resumo
 | `/profissional/fila` | Fila oficial | `GET /fila` |
 | `/profissional/pacientes/:id` | Detalhe e explicação | `GET /solicitacoes/{id}`, `.../explicacao` |
 | `/profissional/revisao` | Caixa do médico | `GET /mudancas`, `POST /mudancas/{id}/decisao`, `POST /eventos/processar`, `GET /mudancas/{id}/explicacao` |
-| `/profissional/pendencias` | Pendências operacionais | `GET /pendencias` |
 
 - **`src/api/`:** `cliente.ts` (fetch tipado, erro `ErroApi`), `tipos.ts` (contratos da API), `useApi.ts` (carregar, erro, recarregar), `rotulos.ts` (códigos do motor → texto).
 - **Sessão:** em `sessionStorage` (`store/auth.tsx`). `RotaProtegida` guarda a área profissional; o `medico_id` da sessão vai em cada decisão.
+- **Pendências e dados da carga** não têm tela própria: as pendências aparecem no detalhe de cada paciente, e o relatório da carga está em `GET /dados` e na página `/pipeline`.
 - **Caixa do médico:** um card sem texto pronto pede a explicação ao backend, um de cada vez, só para os cards da página. A chave inclui `atualizada_em`, então um evento novo pede outro texto.
 
 ## 12. Configuração
