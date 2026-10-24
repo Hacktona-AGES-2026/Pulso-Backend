@@ -55,7 +55,16 @@ Generated texts are versioned in db/explicacoes.jsonl (input facts + text + mode
 
 API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
 
-API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.
+API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /maquina-tempo`, `GET /export/fila_priorizada.csv`.
+
+### Máquina do Tempo (impacto medido)
+
+`fila_cirurgica/maquina_tempo/` (módulo irmão de `priorizacao`): rebobina o log de eventos e reavalia cada paciente a cada novo evento. Mede quantos pacientes o motor teria promovido de fila durante a espera e o gap com a prioridade manual. Determinístico, sem vazamento de futuro, não toca na fila oficial.
+
+    cd fila_cirurgica && python -m maquina_tempo            # manchete + top casos
+    python -m maquina_tempo --caso SOL-2025-00478           # linha do tempo de 1 paciente
+
+API: `GET /maquina-tempo` serve a mesma manchete (em cache; o dataset é estático).
 
 ## Deliverables checklist
 

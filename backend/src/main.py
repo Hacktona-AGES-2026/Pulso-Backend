@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import date
+from functools import lru_cache
 from typing import Literal
 
 import psycopg
@@ -13,9 +14,10 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from . import db
+from . import config, db
 from .llm import LLM
 from .pipeline import consultas, explicacao, fila as fila_oficial, processamento
+from maquina_tempo import metricas as maquina_tempo
 
 app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor propoe, o medico decide.")
 
@@ -49,6 +51,20 @@ class NovoEvento(BaseModel):
 @app.get("/resumo")
 def resumo(con=Depends(conexao)):
     return consultas.resumo(con)
+
+
+@lru_cache(maxsize=4)
+def _maquina_tempo(dataset: str, ref: str) -> dict:
+    """Cache: o dataset e estatico, entao a manchete e calculada uma vez por (dataset, data)."""
+    return maquina_tempo.resumo(dataset, ref)
+
+
+@app.get("/maquina-tempo")
+def maquina_do_tempo():
+    """Manchete da Maquina do Tempo: reavaliando a fila a cada evento, quantos pacientes o motor
+    teria promovido durante a espera, o gap com a prioridade manual e os maiores saltos (replay
+    determinístico sobre o dataset; nao toca na fila oficial)."""
+    return _maquina_tempo(str(config.DATASET), config.DATA_REFERENCIA)
 
 
 @app.get("/fila")
