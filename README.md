@@ -4,7 +4,7 @@
 
 ## Status
 
-Core pipeline works end to end on the full dataset (backend/, branch feat/pipeline-fila).
+Core pipeline works end to end on the full dataset (backend/), with the API the frontend uses, plain-language explanations and the time machine.
 Not built yet: JEV in the pipeline, the monitoring agents, DECISOES.md (see [ideas/ROADMAP.md](ideas/ROADMAP.md)).
 
 ## Run (clean machine)
@@ -15,9 +15,14 @@ Needs Docker only.
 
 The first start takes about a minute: the `api` container waits for Postgres, then runs `python -m src.pipeline rodar --se-vazio` (CSVs -> cleaning -> events -> Postgres -> events one by one) and starts the API. On later starts the database is already loaded and the step is skipped.
 
-- API: http://localhost:8000/docs (CORS allows the frontend on http://localhost:5173 and :5174)
+- API: http://localhost:8000/docs (CORS allows the frontend on ports 5173 and 5174 of `localhost` and `127.0.0.1`; set `PULSO_CORS`, comma-separated origins, for other hosts)
 - Follow the seeding: `docker compose logs -f api`
 - Reload the data from scratch (wipes the database, including decisions made): `docker compose exec api python -m src.pipeline rodar --recriar`
+- Demo state (the start above processes every event, so the doctor's inbox has all 128 requests and the "process events" button has nothing left): load again and process only until the inbox has 3 requests, leaving the other events pending:
+
+      docker compose exec api python -m src.pipeline carregar --recriar --ate-pedidos 3
+
+- Explanations without a cached text are generated on demand by the Ollama running on your machine (`PULSO_LLM_URL` in docker-compose.yml points the container to it). Without Ollama or without the model (`ollama pull gemma4:e4b`), the template text is used. See "Plain-language explanations" below.
 - Reset everything, volume included: `docker compose down -v`
 - Frontend: see [../Pulso-Frontend](../Pulso-Frontend). Doctor login uses a CRM from `GET /medicos` (e.g. `CRM-RS 900001`) and any password with 4+ characters.
 
@@ -36,7 +41,30 @@ Without Docker for the API (needs Python 3.10+; Postgres still comes from Docker
     uvicorn src.main:app --reload              # API: http://localhost:8000/docs
     python -m pytest                           # uses a separate database, pulso_teste
 
-If the local `uvicorn` and the `api` container both run, they share port 8000 (one on IPv4, one on IPv6) and requests may hit either; run only one.
+On Windows (cmd), the setup lines are `python -m venv .venv` and `.venv\Scripts\activate` (PowerShell: `.venv\Scripts\Activate.ps1`); run `set PYTHONUTF8=1` first so files with accents are read as UTF-8.
+
+If the local `uvicorn` and the `api` container both run, they share port 8000 (one on IPv4, one on IPv6) and requests may hit either; run only one (`docker compose stop api` keeps only the database in Docker).
+
+## API
+
+Full list with request and response schemas at http://localhost:8000/docs.
+
+| Route | What it returns or does |
+|---|---|
+| `GET /resumo` | Counts: requests by status, events processed/pending/quarantined, size of each group, change requests by type/status, deadline overdue, golden rule check |
+| `GET /fila?modo=oficial\|recomendada` | The queue with position, group, deadline, justification and patient/procedure data (`limite` up to 1000) |
+| `GET /solicitacoes/{id}` | One request: patient, events, engine state, flags, change requests and decision history |
+| `GET /mudancas?status=pendente\|todas` | The doctor's inbox; `com_explicacao=true` adds the cached plain-language text |
+| `POST /mudancas/{id}/decisao` | `{"decisao": "aprovar"\|"rejeitar", "medico_id": 1, "motivo": "..."}`; rejecting needs a reason |
+| `GET /solicitacoes/{id}/explicacao`, `GET /mudancas/{id}/explicacao` | Plain-language explanation (LLM, template as fallback); `gerar=false` only reads the cache |
+| `POST /eventos` | Registers a new clinical event and processes it at once |
+| `POST /eventos/processar?limite=N` | Processes the next N pending events; the answer says how many new requests were opened (`aberta`) |
+| `GET /marcacoes?severidade=` | Engine flags that need a human look, most severe first |
+| `GET /pendencias` | Operational to-dos (contact, no-shows, HbA1c, exits to confirm) |
+| `GET /dados` | Load report, quarantined events, requests out of the queue |
+| `GET /maquina-tempo` | Time machine headline (see below) |
+| `GET /medicos` | Doctors (the frontend login matches the CRM) |
+| `GET /export/fila_priorizada.csv?modo=` | The deliverable CSV (`com_explicacao=true` uses the LLM text where it exists) |
 
 ## Pipeline (backend/src/pipeline)
 
