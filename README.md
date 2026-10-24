@@ -36,7 +36,9 @@ Needs Python 3.10+ and Docker.
 - fila_recomendada (view) is the queue as if every request were approved; `exportar` writes it by default (`--modo oficial` for the official one). It matches the batch engine position by position (test_recomendada_igual_ao_lote_do_motor).
 - Engine (groups G1a-G7, signals, negation, classifiers): [fila_cirurgica/README.md](fila_cirurgica/README.md). Database: [db/README.md](db/README.md). build_features.py fills features_paciente (for JEV and the patient detail).
 
-API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.
+API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`, `GET /pendencias` (operational to-dos), `GET /marcacoes?severidade=alta|media|baixa|informativa` (engine flags), `GET /dados` (load report, quarantine, requests out of the queue).
+
+The queue and the change inbox include patient name, age and procedure, so the frontend ([Pulso-Frontend](../Pulso-Frontend)) does not need extra calls. CORS allows `http://localhost:5173` by default; set `PULSO_CORS` (comma-separated origins) for other hosts.
 
 ## Deliverables checklist
 
