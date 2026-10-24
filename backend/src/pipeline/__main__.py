@@ -29,6 +29,7 @@ def main(argv=None) -> int:
     for nome in ("rodar", "carregar"):
         p = sub.add_parser(nome)
         p.add_argument("--recriar", action="store_true", help="apaga o banco e carrega de novo")
+        p.add_argument("--se-vazio", action="store_true", help="carrega so se o banco ainda estiver vazio (docker compose up)")
         p.add_argument("--dataset")
         p.add_argument("--data-referencia")
     p = sub.add_parser("processar")
@@ -61,6 +62,9 @@ def main(argv=None) -> int:
         t0 = time.time()
         if a.cmd in ("rodar", "carregar"):
             from pathlib import Path
+            if a.se_vazio and db.banco_populado(con):
+                print("banco ja carregado; nada a fazer")
+                return 0
             r = carga.carregar(con, Path(a.dataset) if a.dataset else None, a.data_referencia, a.recriar)
             _imprimir("carga (passos 1-4)", r)
             if a.cmd == "rodar":
