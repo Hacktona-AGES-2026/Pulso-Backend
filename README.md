@@ -36,6 +36,18 @@ Needs Python 3.10+ and Docker.
 - fila_recomendada (view) is the queue as if every request were approved; `exportar` writes it by default (`--modo oficial` for the official one). It matches the batch engine position by position (test_recomendada_igual_ao_lote_do_motor).
 - Engine (groups G1a-G7, signals, negation, classifiers): [fila_cirurgica/README.md](fila_cirurgica/README.md). Database: [db/README.md](db/README.md). build_features.py fills features_paciente (for JEV and the patient detail).
 
+### Plain-language explanations (LLM, optional)
+
+backend/src/pipeline/explicacao.py: an LLM rewrites the engine's facts (group, deadline, wait, evidence with dates and quotes, alerts, pending items, request waiting for the doctor) into 2-3 sentences. It never changes the queue.
+After every answer a deterministic check rejects any number or date, group code or oncology term that is not in the facts; one retry with the reason, then the template text stands. Texts are cached in `explicacao` by a hash of the facts (same facts, same text; a new event regenerates it).
+
+    ollama serve && ollama pull gemma4:12b         # local (default); or PULSO_LLM_PROVIDER=groq + GROQ_API_KEY in backend/.env
+    python -m src.pipeline explicar mudancas --limite 10   # doctor's inbox (~10 s per text locally)
+    python -m src.pipeline explicar fila --limite 10       # top of the queue
+    python -m src.pipeline exportar --explicacao            # justificativa = LLM text where generated
+
+API: `GET /mudancas/{id}/explicacao`, `GET /solicitacoes/{id}/explicacao` (generate on demand), `GET /mudancas?com_explicacao=true` (cached only).
+
 API: `GET /fila?modo=oficial|recomendada`, `GET /mudancas?status=pendente` (doctor's inbox), `POST /mudancas/{id}/decisao`, `POST /eventos` (new event, processed at once), `POST /eventos/processar?limite=N` (step through pending events), `GET /solicitacoes/{id}`, `GET /resumo`, `GET /medicos`, `GET /export/fila_priorizada.csv`.
 
 ## Deliverables checklist

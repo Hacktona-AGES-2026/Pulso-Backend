@@ -7,7 +7,8 @@
   python -m src.pipeline decidir ID aprovar|rejeitar --medico 1 [--motivo "..."]
   python -m src.pipeline aprovar-todas --medico 1 (demo/teste: fila oficial = recomendada)
   python -m src.pipeline varrer [--data AAAA-MM-DD]
-  python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv]
+  python -m src.pipeline explicar mudancas|fila [--limite N]   texto claro pelo LLM (cache no banco)
+  python -m src.pipeline exportar [--modo recomendada|oficial] [--saida saida/fila_priorizada.csv] [--explicacao]
   python -m src.pipeline resumo
 """
 from __future__ import annotations
@@ -18,7 +19,7 @@ import sys
 import time
 
 from .. import db
-from . import carga, consultas, fila, processamento
+from . import carga, consultas, explicacao, fila, processamento
 
 
 def main(argv=None) -> int:
@@ -43,9 +44,13 @@ def main(argv=None) -> int:
     p.add_argument("--medico", type=int, required=True)
     p = sub.add_parser("varrer")
     p.add_argument("--data")
+    p = sub.add_parser("explicar", help="gera o texto claro dos pedidos pendentes ou do topo da fila")
+    p.add_argument("alvo", choices=["mudancas", "fila"])
+    p.add_argument("--limite", type=int, default=10)
     p = sub.add_parser("exportar")
     p.add_argument("--modo", default="recomendada", choices=["recomendada", "oficial"])
     p.add_argument("--saida", default="saida/fila_priorizada.csv")
+    p.add_argument("--explicacao", action="store_true", help="justificativa = texto do LLM ja gerado, onde houver")
     sub.add_parser("resumo")
     a = ap.parse_args(argv)
 
@@ -75,12 +80,36 @@ def main(argv=None) -> int:
             print(f"{n} pedidos aprovados")
         elif a.cmd == "varrer":
             _imprimir("varredura", processamento.varrer(con, a.data))
+        elif a.cmd == "explicar":
+            _explicar(con, a.alvo, a.limite)
         elif a.cmd == "exportar":
-            print(consultas.exportar(con, a.saida, a.modo))
+            print(consultas.exportar(con, a.saida, a.modo, a.explicacao))
         elif a.cmd == "resumo":
             _imprimir_resumo(consultas.resumo(con))
         print(f"({time.time() - t0:.1f} s)", file=sys.stderr)
     return 0
+
+
+def _explicar(con, alvo: str, limite: int) -> None:
+    from ..llm import LLM, LLMIndisponivel
+    try:
+        llm = LLM()
+    except LLMIndisponivel as exc:
+        print(f"LLM indisponivel: {exc}", file=sys.stderr)
+        return
+    if alvo == "mudancas":
+        ids = [("mudanca", m["id"]) for m in consultas.mudancas(con, "pendente", limite)]
+    else:
+        ids = [("solicitacao", r["solicitacao_id"]) for r in consultas.fila(con, "recomendada", limite=limite)]
+    print(f"{llm.provedor}/{llm.modelo}: {len(ids)} textos")
+    contagem = {}
+    for tipo, i in ids:
+        r = explicacao.explicar(con, tipo, i, llm)
+        chave = "cache" if r.get("em_cache") else r["fonte"]
+        contagem[chave] = contagem.get(chave, 0) + 1
+        print(f"\n[{chave}] {tipo} {i}" + (f"  ({r['motivo']})" if r.get("motivo") else ""))
+        print(f"  {r['texto']}")
+    print(f"\n{contagem}")
 
 
 def _imprimir(titulo, d) -> None:

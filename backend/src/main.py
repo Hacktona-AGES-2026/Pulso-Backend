@@ -14,7 +14,8 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from . import db
-from .pipeline import consultas, fila as fila_oficial, processamento
+from .llm import LLM
+from .pipeline import consultas, explicacao, fila as fila_oficial, processamento
 
 app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor propoe, o medico decide.")
 
@@ -22,6 +23,11 @@ app = FastAPI(title="Pulso", description="Priorizacao da fila cirurgica: o motor
 def conexao() -> Iterator[psycopg.Connection]:
     with db.conectar() as con:
         yield con
+
+
+def obter_llm() -> LLM | None:
+    """None: explicacao.explicar cria o LLM do .env (e cai no template se nao houver). Trocado nos testes."""
+    return None
 
 
 class Decisao(BaseModel):
@@ -61,8 +67,31 @@ def detalhe(solicitacao_id: str, con=Depends(conexao)):
 
 @app.get("/mudancas")
 def caixa_de_pedidos(status: str | None = "pendente", limite: int = Query(100, le=1000), offset: int = 0,
-                     con=Depends(conexao)):
-    return consultas.mudancas(con, None if status == "todas" else status, limite, offset)
+                     com_explicacao: bool = False, con=Depends(conexao)):
+    """com_explicacao: inclui o texto do LLM ja gerado (nao gera nada novo)."""
+    pedidos = consultas.mudancas(con, None if status == "todas" else status, limite, offset)
+    if com_explicacao:
+        for m in pedidos:
+            m["explicacao"] = explicacao.em_cache(con, "mudanca", m["id"])
+    return pedidos
+
+
+@app.get("/solicitacoes/{solicitacao_id}/explicacao")
+def explicar_solicitacao(solicitacao_id: str, gerar: bool = True, con=Depends(conexao), llm=Depends(obter_llm)):
+    """Por que o sistema coloca o paciente nesta fila, em linguagem clara (LLM; template se falhar)."""
+    r = explicacao.explicar(con, "solicitacao", solicitacao_id, llm, gerar)
+    if r is None:
+        raise HTTPException(404, "solicitacao ativa nao encontrada")
+    return r
+
+
+@app.get("/mudancas/{mudanca_id}/explicacao")
+def explicar_pedido(mudanca_id: int, gerar: bool = True, con=Depends(conexao), llm=Depends(obter_llm)):
+    """O que o sistema pede ao medico e por que, em linguagem clara (LLM; template se falhar)."""
+    r = explicacao.explicar(con, "mudanca", mudanca_id, llm, gerar)
+    if r is None:
+        raise HTTPException(404, "pedido nao encontrado")
+    return r
 
 
 @app.get("/mudancas/{mudanca_id}")
@@ -106,6 +135,7 @@ def medicos(con=Depends(conexao)):
 
 
 @app.get("/export/fila_priorizada.csv", response_class=PlainTextResponse)
-def exportar(modo: Literal["oficial", "recomendada"] = "recomendada", con=Depends(conexao)):
-    return PlainTextResponse(consultas.csv_fila(con, modo), media_type="text/csv",
+def exportar(modo: Literal["oficial", "recomendada"] = "recomendada", com_explicacao: bool = False,
+             con=Depends(conexao)):
+    return PlainTextResponse(consultas.csv_fila(con, modo, com_explicacao), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=fila_priorizada.csv"})

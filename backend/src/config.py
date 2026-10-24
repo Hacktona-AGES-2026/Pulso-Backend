@@ -21,6 +21,7 @@ def _carregar_env(arquivo: Path) -> None:
 
 
 _carregar_env(BACKEND / ".env")
+_carregar_env(RAIZ / ".env")  # chaves de LLM que o time ja guarda na raiz (git-ignored)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://pulso:pulso@localhost:5432/pulso")
 DATASET = Path(os.getenv("PULSO_DATASET", RAIZ / "ideas" / "data" / "dataset"))
